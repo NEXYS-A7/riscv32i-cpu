@@ -1,10 +1,10 @@
-module risdv32i_decoder(
+module riscv32i_decoder(
     input [31:0] instr,
     output logic [6:0] opcode,
     output logic [4:0] rd,
     output logic [4:0] rs1, rs2,
     output logic [2:0] funct3,
-    output logic [6:0] funct7
+    output logic [6:0] funct7,
     output logic [31:0] immediate
 );
 
