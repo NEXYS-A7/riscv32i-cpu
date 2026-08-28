@@ -1,0 +1,11 @@
+../../decoder/opcodes.sv
+../../alu/alu_ops.sv
+../../alu/alu.sv
+../../control_unit/control_unit.sv
+../../decoder/decoder.sv
+../../instruction_register.sv
+../../memory/data/data_mem.sv
+../../memory/instruction/instruction_mem.sv
+../../pc/pc.sv
+../../register_file/reg_file.sv
+../top.sv

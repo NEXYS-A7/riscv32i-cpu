@@ -21,6 +21,7 @@ module rv32i_alu (
             ALU_SRA: result = $signed(operand_1) >>> operand_2[4:0];
             ALU_SLT: result = $signed(operand_1) < $signed(operand_2) ? 32'd1 : 32'd0;
             ALU_SLTU: result = operand_1 < operand_2 ? 32'd1 : 32'd0;
+            
         endcase
     end
     assign zero = (result == 32'd0);
