@@ -5,7 +5,8 @@ module rv32i_alu (
     input  logic [31:0] operand_2,
     input  alu_operation_t operation,
     output logic [31:0] result,
-    output logic zero
+    output logic zero,
+    output logic alu_lsb
 );
 
     always_comb begin
@@ -25,4 +26,5 @@ module rv32i_alu (
         endcase
     end
     assign zero = (result == 32'd0);
+    assign alu_lsb = result[0];
 endmodule

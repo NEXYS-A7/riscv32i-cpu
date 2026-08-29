@@ -56,10 +56,10 @@ module top_tb_jal;
         check_reg(10, 32'h00000034);   // jalr link
         check_not(12, 32'd99);         // poison skipped by jalr
         check_reg(13, 32'd13);
-        if (dut.pc === 32'h0000003C)
-            $display("PASS: halted at pc = %h (jalr bit 0 cleared)", dut.pc);
+        if (dut.pc_latch === 32'h0000003C)
+            $display("PASS: halted at pc = %h (jalr bit 0 cleared)", dut.pc_latch);
         else begin
-            $display("FAIL: pc = %h (expected 0000003c; 0000003d means jalr did not clear bit 0)", dut.pc);
+            $display("FAIL: pc = %h (expected 0000003c; 0000003d means jalr did not clear bit 0)", dut.pc_latch);
             fails++;
         end
 

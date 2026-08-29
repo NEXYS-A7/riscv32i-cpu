@@ -4,14 +4,39 @@ module top(
     input logic CLK100MHZ,
     input logic reset
 );
-    //control unit
+    //signal declarations (all up front: SystemVerilog requires declare-before-use
+    //control
     opcode_t opcode;
     alu_operation_t alu_op;
     logic [2:0] funct3;
     logic [6:0] funct7;
-    logic [1:0] alu_src_a, wb_src;
-    logic pc_write, ir_write, alu_src, reg_write, mem_read, mem_write;
+    logic [1:0] alu_src_a, wb_src, pc_src;
+    logic pc_write, ir_write, alu_src, reg_write, mem_read, mem_write, zero, alu_lsb;
 
+    //fetch
+    logic [31:0] next_pc, pc, instr, instr_out, pc_latch, branch_target;
+
+    //decode
+    logic [4:0] rd, rs1, rs2;
+    logic [31:0] immediate;
+    logic [31:0] read_data_a, read_data_b;
+
+    //execute
+    logic [31:0] operand_1, operand_2, alu_res, alu_result_register;
+
+    //memory
+    logic [3:0] byte_en;
+    logic [31:0] store_data;
+    logic [1:0] byte_offset;
+    logic [31:0] mem_read_data, load_res;
+    logic [7:0] load_byte;
+    logic [15:0] load_half;
+
+    //writeback
+    logic [31:0] writeback_data, link_value;
+
+    //---------------------------------------------------------------
+    //control unit
     riscv32i_control_unit cu_module(
         .CLK100MHZ(CLK100MHZ),
         .reset(reset),
@@ -19,6 +44,8 @@ module top(
         .immediate(immediate),
         .funct3(funct3),
         .funct7(funct7),
+        .zero(zero),
+        .alu_lsb(alu_lsb),
         .pc_write(pc_write),
         .ir_write(ir_write),
         .alu_src_a(alu_src_a),
@@ -32,7 +59,6 @@ module top(
     );
 
     //registers.
-    logic [31:0] read_data_a, read_data_b;
     riscv32i_register_file reg_file_module(
         .CLK100MHZ(CLK100MHZ),
         .read_addr_a(rs1), .read_addr_b(rs2),
@@ -50,14 +76,13 @@ module top(
     );
 
     //fetch --> pc wires to instr mem. then advance pc and latch the instruction in im.
-    logic [31:0] next_pc, pc, instr, instr_out, pc_latch, pc_src;
-
-    assign next_pc = pc_src ? {alu_res[31:1], 1'b0} : pc + 32'd4;
+    assign branch_target = pc_latch + immediate;
+    assign next_pc = (pc_src == 2'd2) ? branch_target : (pc_src == 2'd1) ? {alu_res[31:1], 1'b0} : pc + 32'd4;
     riscv32i_program_counter pc_module(
-        .CLK100MHZ(CLK100MHZ), 
-        .reset(reset), 
-        .pc_write(pc_write), 
-        .next_pc(next_pc), 
+        .CLK100MHZ(CLK100MHZ),
+        .reset(reset),
+        .pc_write(pc_write),
+        .next_pc(next_pc),
         .pc(pc)
     );
 
@@ -70,11 +95,9 @@ module top(
         .addr(pc),
         .instr(instr)
     );
-    
+
 
     //decode
-    logic [4:0] rd, rs1, rs2;
-    logic[31:0] immediate;
     riscv32i_decoder decoder_module(
         .instr(instr_out),
         .opcode(opcode),
@@ -85,11 +108,9 @@ module top(
     );
 
     //execute
-    logic[31:0] operand_1, operand_2, alu_res;
-    assign operand_1 = alu_src_a == 2'd1 ? 32'd0 : alu_src_a == 2'd2 ? pc_latch : read_data_a; 
+    assign operand_1 = alu_src_a == 2'd1 ? 32'd0 : alu_src_a == 2'd2 ? pc_latch : read_data_a;
     assign operand_2 = alu_src ? immediate : read_data_b;
 
-    logic[31:0] alu_result_register;
     always_ff @(posedge CLK100MHZ) begin
         alu_result_register <= alu_res;
     end
@@ -97,13 +118,12 @@ module top(
     rv32i_alu alu_module(
         .operand_1(operand_1), .operand_2(operand_2),
         .operation(alu_op),
-        .result(alu_res)
+        .result(alu_res),
+        .zero(zero),
+        .alu_lsb(alu_lsb)
     );
 
     //memory
-    logic [3:0] byte_en;
-    logic [31:0] store_data;
-    logic [1:0] byte_offset;
     assign byte_offset = alu_result_register[1:0];
     always_comb begin
         byte_en = 4'b0000;
@@ -113,7 +133,7 @@ module top(
                 byte_en = 4'b0001 << byte_offset;
                 store_data = read_data_b << (8 * byte_offset);
             end
-            3'b001 : begin 
+            3'b001 : begin
                 byte_en = 4'b0011 << byte_offset;
                 store_data = read_data_b << (8 * byte_offset);
             end
@@ -127,10 +147,6 @@ module top(
             end
         endcase
     end
-
-    logic [31:0] load_res;
-    logic [7:0] load_byte;
-    logic [15:0] load_half;
 
     assign load_byte = mem_read_data[8*byte_offset +: 8];
     assign load_half = mem_read_data[16*alu_result_register[1] +: 16];
@@ -146,8 +162,6 @@ module top(
         endcase
     end
 
-
-    logic [31:0] mem_read_data;
     riscv32i_data_memory data_mem_module(
         .CLK100MHZ(CLK100MHZ),
         .addr(alu_result_register),
@@ -157,10 +171,8 @@ module top(
         .read_data(mem_read_data)
     );
 
-    
+
     //writeback done
-    logic [31:0] writeback_data;
-    logic [31:0] link_value;
     assign link_value = pc_latch + 32'd4;
     always_comb begin
         case(wb_src)

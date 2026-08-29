@@ -45,6 +45,7 @@ run_system alu    top_tb_alu.sv program_alu_test.hex
 run_system mem    top_tb_mem.sv program_mem_test.hex
 run_system ui     top_tb_ui.sv  program_ui_test.hex
 run_system jal    top_tb_jal.sv program_jal_test.hex
+run_system br     top_tb_br.sv  program_br_test.hex
 
 echo
 if [ $fail -eq 0 ]; then echo "ALL TEST SUITES PASSED"; else echo "SOME TESTS FAILED"; exit 1; fi

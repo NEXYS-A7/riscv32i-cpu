@@ -8,6 +8,7 @@ module riscv32i_control_unit(
     input logic [31:0] immediate,
     input logic [2:0] funct3,
     input logic [6:0] funct7,
+    input logic zero, alu_lsb,
     output logic pc_write, //advance pc
     output logic ir_write, //latch fetched instruction
     output logic [1:0] alu_src_a,
@@ -16,8 +17,7 @@ module riscv32i_control_unit(
     output logic reg_write,
     output logic mem_read,
     output logic mem_write,
-    output logic [1:0] wb_src,
-    output logic pc_src
+    output logic [1:0] wb_src, pc_src
 );
 
 
@@ -49,7 +49,7 @@ module riscv32i_control_unit(
 
     always_comb begin
         //defs
-        pc_write = 1'b0;
+        pc_write = 2'd0;
         ir_write = 1'b0;
         alu_src_a = 2'b0;
         alu_src = 1'b0;
@@ -58,7 +58,7 @@ module riscv32i_control_unit(
         mem_read = 1'b0;
         mem_write = 1'b0;
         wb_src = 2'd0;
-        pc_src = 1'b0;
+        pc_src = 2'd0;
         case(state)
             FETCH : begin
                 pc_write = 1'b1;
@@ -117,18 +117,33 @@ module riscv32i_control_unit(
                     end
                     OP_JTYPE : begin
                         pc_write = 1'b1;    
-                        pc_src = 1'b1;
+                        pc_src = 2'd2;
                         alu_src_a = 2'd2;
                         alu_src = 1'b1;
                         alu_op = ALU_ADD;
                     end
                     OP_JALR : begin
                         pc_write = 1'b1;
-                        pc_src = 1'b1;
+                        pc_src = 2'd1;
                         alu_src_a = 2'd0;
                         alu_src = 1'b1;
 
                     end
+                    OP_BTYPE : begin
+                        pc_src = 2'd2;
+                        //default src rs1 rs2
+                        case(funct3)
+                            3'b000 : begin alu_op = ALU_SUB;  pc_write = zero;     end //beq
+                            3'b001 : begin alu_op = ALU_SUB;  pc_write = ~zero;    end //bne
+                            3'b100 : begin alu_op = ALU_SLT;  pc_write = alu_lsb;  end //blt
+                            3'b101 : begin alu_op = ALU_SLT;  pc_write = ~alu_lsb; end //bge
+                            3'b110 : begin alu_op = ALU_SLTU; pc_write = alu_lsb;  end //bltu
+                            3'b111 : begin alu_op = ALU_SLTU; pc_write = ~alu_lsb; end //bgeu
+                            default : pc_write = 1'b0;
+                        endcase
+                    end
+                    OP_MEM : begin end
+                    OP_OS : begin end
                 endcase
             end
             MEMORY : begin
@@ -138,7 +153,7 @@ module riscv32i_control_unit(
 
             end
             WRITEBACK : begin
-                reg_write = 1'b1;
+                reg_write = (opcode != OP_BTYPE);
                 if(opcode == OP_LOAD) begin
                     wb_src = 2'd1;
                     alu_src = 1'b1; //keep byte offset valid for LB/LH extraction
@@ -146,6 +161,7 @@ module riscv32i_control_unit(
                 if(opcode == OP_JTYPE || opcode == OP_JALR) begin
                     wb_src = 2'd2;
                 end
+                
             end
         endcase
     end
