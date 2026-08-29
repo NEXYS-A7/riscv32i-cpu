@@ -3,3 +3,5 @@ top/testing/build/
 *.vcd
 top/cpu_test
 top/cpu_ls_test
+*_test
+*_tests
